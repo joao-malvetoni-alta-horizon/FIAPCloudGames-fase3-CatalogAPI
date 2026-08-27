@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+  namespace: fcg
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: catalog-api }
+  template:
+    metadata:
+      labels: { app: catalog-api }
+    spec:
+      containers:
+        - name: catalog-api
+          image: fcg/catalog-api:1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              valueFrom: { configMapKeyRef: { name: fcg-config, key: ASPNETCORE_ENVIRONMENT } }
+            # Catálogo usa URI amqp:// (não usa RabbitMq__Host).
+            - name: JwtSettings__SecretKey
+              valueFrom: { secretKeyRef: { name: fcg-secrets, key: JwtSettings__SecretKey } }
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom: { secretKeyRef: { name: fcg-secrets, key: Catalog__ConnectionString } }
+            - name: ConnectionStrings__RabbitMqConnection
+              valueFrom: { secretKeyRef: { name: fcg-secrets, key: Catalog__RabbitMqConnection } }
+          # Catálogo não expõe /health: sonda TCP na porta 8080.
+          livenessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            tcpSocket: { port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 10

@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CatalogAPI.API/CatalogAPI.API.csproj" />
+    <Project Path="src/CatalogAPI.Application/CatalogAPI.Application.csproj" />
+    <Project Path="src/CatalogAPI.Domain/CatalogAPI.Domain.csproj" />
+    <Project Path="src/CatalogAPI.Infrastructure/CatalogAPI.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/CatalogAPI.API.Tests/CatalogAPI.API.Tests.csproj" />
+    <Project Path="test/CatalogAPI.Application.Tests/CatalogAPI.Application.Tests.csproj" />
+    <Project Path="test/CatalogAPI.Domain.Tests/CatalogAPI.Domain.Tests.csproj" />
+    <Project Path="test/CatalogAPI.Infrastructure.Tests/CatalogAPI.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

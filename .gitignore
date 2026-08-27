@@ -1,0 +1,23 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+## IDE
+.idea/
+.vs/
+*.swp
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Docker
+pgdata/
+
+temp.py
