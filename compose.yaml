@@ -29,6 +29,9 @@ services:
       - RabbitMq__Username=guest
       - RabbitMq__Password=pass
       - ASPNETCORE_ENVIRONMENT=Development
+      # Observabilidade (New Relic): a license key vem do ambiente do host (ou do .env),
+      # nunca literal no repositório. Sem ela o agente sobe mas não conecta.
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
     depends_on:
       catalogdb:
         condition: service_healthy
