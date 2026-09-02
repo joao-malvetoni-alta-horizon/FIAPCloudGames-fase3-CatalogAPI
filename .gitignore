@@ -21,3 +21,6 @@ Thumbs.db
 pgdata/
 
 temp.py
+
+.env
+.env.*
