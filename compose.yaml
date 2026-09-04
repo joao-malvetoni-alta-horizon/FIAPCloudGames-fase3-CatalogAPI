@@ -21,6 +21,23 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: catalogredis
+    command: >
+      redis-server
+      --user default off
+      --user catalog on ">pass" "~*" "&*" "+@all"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--user", "catalog", "--pass", "pass", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      
   catalogservice:
     build:
       context: .
@@ -29,6 +46,7 @@ services:
       - "5001:8080"
     environment:
       - ConnectionStrings__DefaultConnection=Host=catalogdb;Database=catalogdb;Username=postgres;Password=pass
+      - ConnectionStrings__Redis=redis:6379,user=catalog,password=pass,abortConnect=false
       - RabbitMq__Host=rabbitmq
       - RabbitMq__Port=5672
       - RabbitMq__Username=guest
@@ -38,6 +56,8 @@ services:
       catalogdb:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   rabbitmq:
@@ -57,3 +77,4 @@ services:
 
 volumes:
   catalog_data:
+  redis_data:

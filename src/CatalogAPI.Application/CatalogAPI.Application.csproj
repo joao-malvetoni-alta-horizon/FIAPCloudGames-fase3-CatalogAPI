@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Contexts\" />
+    <Folder Include="Contexts\Libraries\Cache\DTOs\" />
   </ItemGroup>
 
 </Project>

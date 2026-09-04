@@ -1,3 +1,4 @@
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Application.Shared.Messaging;
 using CatalogAPI.Domain.Contexts.Libraries.Commands;
 using FiapCloudGames.Contracts.Payments;
@@ -12,7 +13,7 @@ namespace CatalogAPI.Application.Contexts.Libraries.EventHandlers;
 /// </summary>
 public partial class PaymentProcessedEventHandler(
     IGamePurchase repository,
-    ILogger<PaymentProcessedEventHandler> logger) : IEventHandler<PaymentProcessedEvent>
+    ILogger<PaymentProcessedEventHandler> logger, ICacheService cacheService) : IEventHandler<PaymentProcessedEvent>
 {
     public async Task HandleAsync(PaymentProcessedEvent paymentProcessed, CancellationToken cancellationToken = default)
     {
