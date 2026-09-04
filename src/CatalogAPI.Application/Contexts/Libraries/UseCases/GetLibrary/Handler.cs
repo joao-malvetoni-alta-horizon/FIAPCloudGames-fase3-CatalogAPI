@@ -22,34 +22,36 @@ public class Handler(IGetLibrary getLibraryQuery, ICacheService cacheService) : 
             );
         }
 
-        var (games, totalCount) = await cacheService.GetOrSetAsync(
+        var pagedLibraryResponse  = await cacheService.GetOrSetAsync(
             cacheKey,
             async () =>
             {
-                return await getLibraryQuery.ExecuteAsync(
+                var(games, totalCount) = await getLibraryQuery.ExecuteAsync(
                     request.UserId,
                     request.Page,
                     request.PageSize,
                     cancellationToken
+                );
+
+                var gameDtos = games.Select(game => new LibraryGameItemResponse(
+                    game.Id,
+                    game.Title.Value,
+                    game.Genre,
+                    game.Price.Amount
+                )).ToList();
+
+                return new PagedLibraryResponse(
+                    gameDtos,
+                    request.Page,
+                    request.PageSize,
+                    totalCount
                 );
             },
             TimeSpan.FromMinutes(3),
             cancellationToken
         );
 
-        var gameDtos = games.Select(game => new LibraryGameItemResponse(
-            game.Id,
-            game.Title.Value,
-            game.Genre,
-            game.Price.Amount
-        )).ToList();
-
-        var pagedLibraryResponse = new PagedLibraryResponse(
-            gameDtos,
-            request.Page,
-            request.PageSize,
-            totalCount
-        );
+        
 
         return new Response("User library retrieved successfully.", pagedLibraryResponse);
     }

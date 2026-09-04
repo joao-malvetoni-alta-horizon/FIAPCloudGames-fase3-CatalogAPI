@@ -1,4 +1,5 @@
 using CatalogAPI.Application.Contexts.Games.UseCases.Delete;
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Commands;
 using CatalogAPI.Domain.Contexts.Games.Exceptions;
 using CatalogAPI.Domain.Shared;
@@ -14,7 +15,7 @@ public class HandlerTests
     public HandlerTests()
     {
         _repository = Substitute.For<IDelete>();
-        _handler = new Handler(_repository);
+        _handler = new Handler(_repository, Substitute.For<ICacheService>());
     }
 
     [Fact]

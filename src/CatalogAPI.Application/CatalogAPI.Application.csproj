@@ -18,8 +18,4 @@
     <ProjectReference Include="..\CatalogAPI.Domain\CatalogAPI.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Contexts\Libraries\Cache\DTOs\" />
-  </ItemGroup>
-
 </Project>

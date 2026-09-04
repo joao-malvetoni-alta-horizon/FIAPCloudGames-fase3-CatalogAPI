@@ -13,7 +13,7 @@ namespace CatalogAPI.Application.Contexts.Libraries.EventHandlers;
 /// </summary>
 public partial class PaymentProcessedEventHandler(
     IGamePurchase repository,
-    ILogger<PaymentProcessedEventHandler> logger, ICacheService cacheService) : IEventHandler<PaymentProcessedEvent>
+    ILogger<PaymentProcessedEventHandler> logger) : IEventHandler<PaymentProcessedEvent>
 {
     public async Task HandleAsync(PaymentProcessedEvent paymentProcessed, CancellationToken cancellationToken = default)
     {
