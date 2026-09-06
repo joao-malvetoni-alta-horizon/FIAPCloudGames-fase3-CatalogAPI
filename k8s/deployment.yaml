@@ -27,6 +27,10 @@ spec:
               valueFrom: { secretKeyRef: { name: fcg-secrets, key: Catalog__ConnectionString } }
             - name: ConnectionStrings__RabbitMqConnection
               valueFrom: { secretKeyRef: { name: fcg-secrets, key: Catalog__RabbitMqConnection } }
+            # Observabilidade (New Relic). A license key vem de Secret, nunca de ConfigMap.
+            # As demais variáveis do agente (app name, tracing, logs) já vêm da imagem (Dockerfile).
+            - name: NEW_RELIC_LICENSE_KEY
+              valueFrom: { secretKeyRef: { name: fcg-secrets, key: NewRelic__LicenseKey } }
           # Catálogo não expõe /health: sonda TCP na porta 8080.
           livenessProbe:
             tcpSocket: { port: 8080 }

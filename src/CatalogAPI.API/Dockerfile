@@ -20,4 +20,19 @@ EXPOSE 8080
 EXPOSE 8081
 
 COPY --from=build /app/publish .
+
+# Agente APM New Relic: o pacote NuGet NewRelic.Agent publica o agente em /app/newrelic.
+# O profiler do CoreCLR só é carregado quando estas variáveis estão presentes, então a
+# imagem já sobe instrumentada; sem NEW_RELIC_LICENSE_KEY o agente apenas não conecta.
+# A license key NÃO fica aqui: vem de Kubernetes Secret (ver k8s/deployment.yaml).
+ENV CORECLR_ENABLE_PROFILING=1 \
+    CORECLR_PROFILER={36032161-FFC0-4B61-B559-F6C5D41BAE5A} \
+    CORECLR_NEWRELIC_HOME=/app/newrelic \
+    CORECLR_PROFILER_PATH=/app/newrelic/libNewRelicProfiler.so \
+    NEW_RELIC_APP_NAME=FCG-CatalogAPI \
+    NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true \
+    NEW_RELIC_APPLICATION_LOGGING_ENABLED=true \
+    NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=true \
+    NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED=true
+
 ENTRYPOINT ["dotnet", "CatalogAPI.API.dll"]

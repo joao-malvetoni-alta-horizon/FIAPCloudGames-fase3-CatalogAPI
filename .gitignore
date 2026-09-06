@@ -20,6 +20,9 @@ Thumbs.db
 ## Docker
 pgdata/
 
+## Variáveis de ambiente locais (license keys, segredos)
+.env
+
 temp.py
 
 .env

@@ -312,3 +312,139 @@ Isso sobe três serviços:
 
 A API ficará disponível em `http://localhost:5001`. O container roda com
 `ASPNETCORE_ENVIRONMENT=Development`, então o **Swagger fica ativo** em `http://localhost:5001/swagger`.
+
+---
+
+## Observabilidade (New Relic)
+
+A plataforma de APM gerenciada escolhida para a Fase 3 (**Opção B**) é o **New Relic**. A CatalogAPI
+é instrumentada pelo **agente .NET do New Relic**, distribuído pelo pacote NuGet `NewRelic.Agent`
+(referenciado apenas em `CatalogAPI.API`, que é o processo que roda). O pacote publica o agente em
+`newrelic/` na saída do `dotnet publish`; o profiler do CoreCLR é ativado pelas variáveis
+`CORECLR_*` já definidas no **estágio de runtime do `Dockerfile`**, então a imagem sobe instrumentada
+sem nenhuma chamada no `Program.cs`.
+
+O pacote `NewRelic.Agent.Api` (referenciado em `CatalogAPI.Application`) expõe a API do agente em
+tempo de compilação e é usado apenas para anexar **atributos customizados** ao trace da compra de
+jogo — ver _Trace do fluxo "Compra de Jogo"_.
+
+> Nenhuma configuração de log foi trocada: a aplicação continua usando o `Microsoft.Extensions.Logging`
+> padrão do ASP.NET Core, que o agente instrumenta automaticamente. Não há sink HTTP nem Serilog.
+
+### Variáveis de ambiente
+
+| Variável | Onde é definida | Valor | Descrição |
+|---|---|---|---|
+| `CORECLR_ENABLE_PROFILING` | `Dockerfile` | `1` | Habilita o profiler do CoreCLR (sem isso o agente não carrega) |
+| `CORECLR_PROFILER` | `Dockerfile` | `{36032161-FFC0-4B61-B559-F6C5D41BAE5A}` | CLSID fixo do profiler do New Relic (case-sensitive) |
+| `CORECLR_NEWRELIC_HOME` | `Dockerfile` | `/app/newrelic` | Diretório do agente dentro da imagem |
+| `CORECLR_PROFILER_PATH` | `Dockerfile` | `/app/newrelic/libNewRelicProfiler.so` | Biblioteca nativa do profiler (linux-x64) |
+| `NEW_RELIC_APP_NAME` | `Dockerfile` | `FCG-CatalogAPI` | Nome da aplicação no New Relic (padrão `FCG-<serviço>`) |
+| `NEW_RELIC_DISTRIBUTED_TRACING_ENABLED` | `Dockerfile` | `true` | Liga o trace distribuído (propagação automática sobre HTTP) |
+| `NEW_RELIC_APPLICATION_LOGGING_ENABLED` | `Dockerfile` | `true` | Liga a instrumentação de logs |
+| `NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED` | `Dockerfile` | `true` | Encaminha os logs da aplicação para a plataforma |
+| `NEW_RELIC_APPLICATION_LOGGING_LOCAL_DECORATING_ENABLED` | `Dockerfile` | `true` | Decora os logs com os metadados de correlação (trace/span) |
+| `NEW_RELIC_LICENSE_KEY` | **Secret / ambiente** | _(segredo)_ | License key da conta. **Nunca** vai para o repositório nem para a imagem |
+
+Sem `NEW_RELIC_LICENSE_KEY` a aplicação sobe normalmente — o agente apenas não conecta à plataforma.
+
+### Kubernetes — license key via Secret
+
+Conforme o requisito técnico da Fase 3 (*"as chaves de API devem ser gerenciadas via Kubernetes
+Secrets"*), a license key é lida do Secret `fcg-secrets` (chave `NewRelic__LicenseKey`) e injetada em
+`k8s/deployment.yaml` — nunca de ConfigMap, nunca literal no manifesto:
+
+```yaml
+- name: NEW_RELIC_LICENSE_KEY
+  valueFrom: { secretKeyRef: { name: fcg-secrets, key: NewRelic__LicenseKey } }
+```
+
+Para criar/atualizar a chave no cluster:
+
+```bash
+kubectl -n fcg create secret generic fcg-secrets \
+  --from-literal=NewRelic__LicenseKey=<sua-license-key> \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+> O comando acima cria o Secret apenas com essa chave. Se o `fcg-secrets` já existir com as demais
+> chaves (`JwtSettings__SecretKey`, `Catalog__ConnectionString`, `Catalog__RabbitMqConnection`),
+> repita-as no mesmo comando ou use `kubectl patch` para não sobrescrever o Secret existente.
+
+### Rodando localmente
+
+Com Docker Compose, a chave é repassada do ambiente do host (ou de um arquivo `.env`, que está no
+`.gitignore`). Use o `.env.example` como base:
+
+```bash
+cp .env.example .env          # e preencha NEW_RELIC_LICENSE_KEY
+docker compose up -d --build
+```
+
+Ou exportando a variável direto no shell:
+
+```bash
+export NEW_RELIC_LICENSE_KEY=<sua-license-key>
+docker compose up -d --build
+```
+
+Rodando fora do Docker (`dotnet run`), o agente só carrega se as variáveis `CORECLR_*` apontarem para
+a pasta `newrelic/` da saída de build/publish — o mais simples é usar o Compose. Sem elas, a aplicação
+roda normalmente, apenas sem instrumentação.
+
+### Os três pilares
+
+| Pilar | Como é atendido | Observação |
+|---|---|---|
+| **Métricas** | Automático pelo agente APM: latência, throughput e taxa de erro por endpoint, além de métricas de banco (EF Core/Npgsql) | O dashboard é montado na UI do New Relic, fora deste repositório |
+| **Logs** | `NEW_RELIC_APPLICATION_LOGGING_*` liga o encaminhamento e a decoração automáticos do `Microsoft.Extensions.Logging` | Sem alteração no código de log da aplicação |
+| **Traces** | Trace distribuído ligado; propagação automática **sobre HTTP** | A propagação **não** atravessa o RabbitMQ — ver a limitação abaixo |
+
+### Trace do fluxo "Compra de Jogo"
+
+A CatalogAPI é o ponto de entrada do fluxo: `POST /api/v1/library/add` valida o jogo e a posse e
+publica o `OrderPlacedEvent`, consumido pela PaymentsAPI, que devolve o `PaymentProcessedEvent`
+(ver _Mensageria e Eventos_). Para o trace ficar navegável, o handler de `InitiateGamePurchase`
+anexa atributos customizados à transação:
+
+| Atributo | Valor |
+|---|---|
+| `fcg.flow` | `compra-jogo` |
+| `fcg.userId` | `Guid` do usuário (identificador opaco) |
+| `fcg.gameId` | `Guid` do jogo |
+| `fcg.orderPlacedEventId` | `Guid` do `OrderPlacedEvent` publicado |
+
+São apenas identificadores opacos — **nenhum dado sensível** (e-mail, senha, token ou CPF) é enviado
+para a plataforma.
+
+### Limitação conhecida: o trace distribuído não atravessa o RabbitMQ
+
+O agente New Relic **10.54.0** instrumenta o RabbitMQ apenas até a versão **6.8.1** do cliente. A
+instrumentação (`NewRelic.Providers.Wrapper.RabbitMq.Instrumentation.xml`) casa com
+`maxVersion="6.8.1"` nos tipos `RabbitMQ.Client.Framing.Impl.Model` e
+`RabbitMQ.Client.Events.EventingBasicConsumer`, que **não existem mais** na API 7.x.
+
+Este repositório resolve **`RabbitMQ.Client` 7.2.1**, trazido transitivamente por
+`FiapCloudGames.RabbitMq` 1.0.0. Consequências:
+
+- a publicação e o consumo de mensagens **não geram spans** de mensageria no New Relic;
+- o `traceparent` **não é propagado** pela fila, então o trace da CatalogAPI e o da PaymentsAPI
+  aparecem como **traces separados**, e não como um único trace ponta-a-ponta;
+- o segundo trecho da compra (consumo do `PaymentProcessedEvent` pelo `BackgroundService`) roda fora
+  de uma transação do APM — a evidência dele vem dos **logs**, que continuam sendo encaminhados.
+
+A correlação entre os dois lados é feita **manualmente**, pelos atributos `fcg.gameId` / `fcg.userId`
+e pelo `fcg.orderPlacedEventId`, que também aparecem nos logs do consumidor.
+
+Como este MR é de observabilidade, o wrapper de mensageria **não foi reescrito** para contornar isso.
+Caminhos possíveis, se a limitação precisar ser resolvida no futuro:
+
+1. usar a ponte de OpenTelemetry do agente (`NEW_RELIC_OPENTELEMETRY_ENABLED=true`, desligada por
+   padrão) junto com o `RabbitMQActivitySource` do cliente 7.x — que exige atribuir explicitamente
+   `RabbitMQActivitySource.ContextInjector = RabbitMQActivitySource.DefaultContextInjector` (e o
+   `ContextExtractor` correspondente) no pacote `FiapCloudGames.RabbitMq`, já que por padrão ele
+   **não** injeta o `traceparent` nos headers da mensagem;
+2. propagar o payload do trace manualmente com a API do agente
+   (`CreateDistributedTracePayload` / `AcceptDistributedTraceHeaders`) no publisher e no processor.
+
+Ambos alteram o pacote compartilhado de mensageria e ficam fora do escopo deste MR.
