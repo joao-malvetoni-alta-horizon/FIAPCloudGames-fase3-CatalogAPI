@@ -24,3 +24,6 @@ pgdata/
 .env
 
 temp.py
+
+.env
+.env.*

@@ -1,5 +1,7 @@
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Commands;
 using CatalogAPI.Domain.Contexts.Games.Queries;
+using CatalogAPI.Infrastructure.Cache;
 using CatalogAPI.Infrastructure.Contexts.Games.UseCases.Create;
 using CatalogAPI.Infrastructure.Contexts.Libraries.Messaging;
 using CatalogAPI.Infrastructure.Data;
@@ -8,6 +10,7 @@ using FiapCloudGames.RabbitMq.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 
 namespace CatalogAPI.Infrastructure.DependencyInjection;
 
@@ -54,6 +57,8 @@ public static class InfrastructureServiceExtension
 
         AddMessaging(services, configuration);
 
+        AddRedis(services, configuration);
+
         return services;
     }
 
@@ -74,5 +79,12 @@ public static class InfrastructureServiceExtension
                 PaymentsMessaging.Exchange,
                 "catalog.payment-processed",
                 PaymentsMessaging.RoutingKeys.Status));
+    }
+    private static void AddRedis(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton<IConnectionMultiplexer>(sp =>
+            ConnectionMultiplexer.Connect(configuration.GetConnectionString("Redis")));
+
+        services.AddSingleton<ICacheService, RedisCacheService>();
     }
 }

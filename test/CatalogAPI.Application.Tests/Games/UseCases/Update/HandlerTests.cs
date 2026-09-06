@@ -1,4 +1,5 @@
 using CatalogAPI.Application.Contexts.Games.UseCases.Update;
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Commands;
 using CatalogAPI.Domain.Contexts.Games.Enums;
 using CatalogAPI.Domain.Contexts.Games.Exceptions;
@@ -16,7 +17,7 @@ public class HandlerTests
     public HandlerTests()
     {
         _repository = Substitute.For<IUpdate>();
-        _handler = new Handler(_repository);
+        _handler = new Handler(_repository, Substitute.For<ICacheService>());
     }
 
     private static Request ValidRequest(Guid? id = null) =>

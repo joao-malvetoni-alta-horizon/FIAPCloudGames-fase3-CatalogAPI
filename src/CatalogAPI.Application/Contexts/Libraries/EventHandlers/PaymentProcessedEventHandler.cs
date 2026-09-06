@@ -1,3 +1,4 @@
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Application.Shared.Messaging;
 using CatalogAPI.Domain.Contexts.Libraries.Commands;
 using FiapCloudGames.Contracts.Payments;

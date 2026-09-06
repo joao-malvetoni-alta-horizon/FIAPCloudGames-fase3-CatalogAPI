@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".env" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/CatalogAPI.API/CatalogAPI.API.csproj" />
     <Project Path="src/CatalogAPI.Application/CatalogAPI.Application.csproj" />

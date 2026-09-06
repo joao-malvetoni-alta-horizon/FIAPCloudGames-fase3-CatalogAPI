@@ -1,4 +1,5 @@
 using CatalogAPI.Application.Contexts.Libraries.UseCases.GetLibrary;
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Entities;
 using CatalogAPI.Domain.Contexts.Games.Enums;
 using CatalogAPI.Domain.Contexts.Libraries.Queries;
@@ -15,7 +16,7 @@ public class HandlerTests
     public HandlerTests()
     {
         _query = Substitute.For<IGetLibrary>();
-        _handler = new Handler(_query);
+        _handler = new Handler(_query, Substitute.For<ICacheService>());
     }
 
     [Fact]
