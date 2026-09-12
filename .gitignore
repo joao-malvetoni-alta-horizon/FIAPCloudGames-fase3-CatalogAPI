@@ -22,5 +22,7 @@ pgdata/
 
 temp.py
 
+## Environment (nunca commitar license key / secrets)
 .env
 .env.*
+!.env.example

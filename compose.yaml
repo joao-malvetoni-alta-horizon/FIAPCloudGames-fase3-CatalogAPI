@@ -6,11 +6,6 @@ services:
       POSTGRES_DB: catalogdb
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: pass
-      NEW_RELIC_LICENSE_KEY: ${NEW_RELIC_LICENSE_KEY}
-      NEW_RELIC_APP_NAME: FIAPCloudGames-fase3-CatalogAPI
-      NEW_RELIC_DISTRIBUTED_TRACING_ENABLED: "true"
-      NEW_RELIC_APPLICATION_LOGGING_ENABLED: "true"
-      NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED: "true"
     ports:
       - "5432:5432"
     volumes:
@@ -52,6 +47,11 @@ services:
       - RabbitMq__Username=guest
       - RabbitMq__Password=pass
       - ASPNETCORE_ENVIRONMENT=Development
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY:-}
+      - NEW_RELIC_APP_NAME=FIAPCloudGames-fase3-CatalogAPI
+      - NEW_RELIC_DISTRIBUTED_TRACING_ENABLED=true
+      - NEW_RELIC_APPLICATION_LOGGING_ENABLED=true
+      - NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED=true
     depends_on:
       catalogdb:
         condition: service_healthy
