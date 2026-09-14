@@ -4,6 +4,7 @@ using CatalogAPI.Application.Shared.Messaging;
 using FiapCloudGames.Contracts;
 using FiapCloudGames.RabbitMq.Publishers;
 using Microsoft.Extensions.Logging;
+using NewRelic.Api.Agent;
 
 namespace CatalogAPI.Infrastructure.Contexts.Libraries.Messaging;
 
@@ -11,6 +12,8 @@ namespace CatalogAPI.Infrastructure.Contexts.Libraries.Messaging;
 /// Adapta o IRabbitMqPublisher (pacote FiapCloudGames.RabbitMq) para o contrato
 /// IIntegrationEventPublisher da camada de Application. A rota (exchange/routing key)
 /// é resolvida a partir do atributo [IntegrationEventRoute] do próprio evento.
+/// Também injeta o contexto de trace distribuído do New Relic nos headers da mensagem,
+/// para que o consumidor do outro lado da fila continue o mesmo trace.
 /// </summary>
 public sealed partial class RabbitMqIntegrationEventPublisher(
     IRabbitMqPublisher publisher,
@@ -32,12 +35,29 @@ public sealed partial class RabbitMqIntegrationEventPublisher(
 
         try
         {
-            await publisher.PublishAsync(exchange, routingKey, integrationEvent, cancellationToken);
+            await publisher.PublishAsync(
+                exchange, routingKey, integrationEvent, BuildDistributedTraceHeaders(), cancellationToken);
         }
         catch (Exception ex)
         {
             LogPublishFailed(ex, integrationEvent.GetType().Name, integrationEvent.EventId);
         }
+    }
+
+    /// <summary>
+    /// Monta os headers de trace distribuído (traceparent, tracestate e o proprietário newrelic)
+    /// a partir da transação corrente do agente. Sem transação ativa o agente devolve um
+    /// NoOpTransaction: o dicionário volta vazio, o pacote publica a mensagem sem tabela de
+    /// headers e nada quebra — esse é o caso de testes e de publicações fora de requisição HTTP.
+    /// </summary>
+    private static Dictionary<string, object?> BuildDistributedTraceHeaders()
+    {
+        var headers = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        NewRelic.Api.Agent.NewRelic.GetAgent().CurrentTransaction
+            .InsertDistributedTraceHeaders(headers, static (carrier, key, value) => carrier[key] = value);
+
+        return headers;
     }
 
     private static (string Exchange, string RoutingKey) ResolveRoute(Type eventType) =>

@@ -1,4 +1,5 @@
 using CatalogAPI.Application.Contexts.Libraries.UseCases.GetLibrary;
+using CatalogAPI.Application.Contexts.Libraries.UseCases.GetLibrary.DTOs;
 using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Entities;
 using CatalogAPI.Domain.Contexts.Games.Enums;
@@ -10,13 +11,22 @@ namespace CatalogAPI.Application.Tests.Libraries.UseCases.GetLibrary;
 public class HandlerTests
 {
     private readonly IGetLibrary _query;
+    private readonly ICacheService _cacheService;
     private readonly Handler _handler;
     private static readonly DateOnly Tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
 
     public HandlerTests()
     {
         _query = Substitute.For<IGetLibrary>();
-        _handler = new Handler(_query, Substitute.For<ICacheService>());
+        _cacheService = Substitute.For<ICacheService>();
+
+        // Cache sempre "frio": delega para a factory, mantendo os testes focados no handler.
+        _cacheService.GetOrSetAsync(
+                Arg.Any<string>(), Arg.Any<Func<Task<PagedLibraryResponse?>>>(),
+                Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<Task<PagedLibraryResponse?>>>()());
+
+        _handler = new Handler(_query, _cacheService);
     }
 
     [Fact]

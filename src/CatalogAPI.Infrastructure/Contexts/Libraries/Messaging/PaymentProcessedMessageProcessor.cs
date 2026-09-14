@@ -8,6 +8,7 @@ using FiapCloudGames.RabbitMq.Consumers;
 using FiapCloudGames.RabbitMq.Processing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using NewRelic.Api.Agent;
 using Npgsql;
 
 namespace CatalogAPI.Infrastructure.Contexts.Libraries.Messaging;
@@ -18,6 +19,8 @@ namespace CatalogAPI.Infrastructure.Contexts.Libraries.Messaging;
 /// pacote FiapCloudGames.RabbitMq) e da resolução via injeção de dependência (delegada ao
 /// <see cref="IEventDispatcher"/>). Não contém lógica de aplicação — apenas traduz o resultado do
 /// despacho para a política de reentrega do broker.
+/// O processamento é uma transação do New Relic que aceita o contexto de trace distribuído vindo
+/// nos headers da mensagem, ligando o consumo ao trace que originou a publicação na PaymentsAPI.
 /// </summary>
 public sealed partial class PaymentProcessedMessageProcessor(
     IEventDispatcher dispatcher,
@@ -30,8 +33,22 @@ public sealed partial class PaymentProcessedMessageProcessor(
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public async Task<MessageProcessingResult> ProcessAsync(ReadOnlyMemory<byte> body, CancellationToken cancellationToken)
+    [Transaction]
+    public async Task<MessageProcessingResult> ProcessAsync(
+        ReadOnlyMemory<byte> body,
+        IReadOnlyDictionary<string, string?> headers,
+        CancellationToken cancellationToken)
     {
+        // Precisa ser a primeira coisa dentro da transação: é o que emenda este consumo ao trace
+        // do publicador. TransportType.Queue faz o New Relic desenhar o salto como fila.
+        NewRelic.Api.Agent.NewRelic.GetAgent().CurrentTransaction
+            .AcceptDistributedTraceHeaders(
+                headers,
+                static (carrier, key) => carrier.TryGetValue(key, out var value) && value is not null
+                    ? new[] { value }
+                    : Array.Empty<string>(),
+                TransportType.Queue);
+
         if (!TryDeserialize(body, out PaymentProcessedEvent? integrationEvent))
         {
             return MessageProcessingResult.PoisonMessage;
