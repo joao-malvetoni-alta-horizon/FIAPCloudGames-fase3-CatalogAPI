@@ -1,4 +1,6 @@
 using CatalogAPI.Application.Contexts.Games.UseCases.GetById;
+using CatalogAPI.Application.Contexts.Games.UseCases.GetById.DTOs;
+using CatalogAPI.Application.Shared.Cache;
 using CatalogAPI.Domain.Contexts.Games.Entities;
 using CatalogAPI.Domain.Contexts.Games.Enums;
 using CatalogAPI.Domain.Contexts.Games.Exceptions;
@@ -10,13 +12,22 @@ namespace CatalogAPI.Application.Tests.Games.UseCases.GetById;
 public class HandlerTests
 {
     private readonly IGetById _repository;
+    private readonly ICacheService _cacheService;
     private readonly Handler _handler;
     private static readonly DateOnly Tomorrow = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
 
     public HandlerTests()
     {
         _repository = Substitute.For<IGetById>();
-        _handler = new Handler(_repository);
+        _cacheService = Substitute.For<ICacheService>();
+
+        // Cache sempre "frio": delega para a factory, mantendo os testes focados no handler.
+        _cacheService.GetOrSetAsync(
+                Arg.Any<string>(), Arg.Any<Func<Task<DetailGameResponse?>>>(),
+                Arg.Any<TimeSpan>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<Task<DetailGameResponse?>>>()());
+
+        _handler = new Handler(_repository, _cacheService);
     }
 
     [Fact]
